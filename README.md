@@ -486,19 +486,21 @@ indian-store-mcp-server/
 │   └── middleware/
 │       └── auth.go                  # Token validation middleware
 ├── k8s/
-│   ├── deployement.yaml             # MCP server deployment
-│   ├── configmap.yaml               # Configuration (URLs, database)
-│   ├── gateway.yaml                 # Gateway API routing
+│   ├── .gitignore                   # Git ignore rules for k8s
+│   ├── configmap.yaml               # ConfigMap and secrets for MCP server
+│   ├── deployement.yaml             # MCP server deployment and service
+│   ├── gateway.yaml                 # Gateway API configuration
+│   ├── README.md                    # Kubernetes deployment guide
 │   └── hydra/
-│       ├── postgres-sts.yaml        # PostgreSQL deployment
+│       ├── README.md                # Ory Hydra deployment guide
+│       ├── postgres-sts.yaml        # PostgreSQL StatefulSet for Hydra
 │       └── ory-hydra-values.yaml    # Helm values for Ory Hydra
 ├── Dockerfile
 ├── go.mod
 ├── go.sum
 ├── README.md                        # This file
 ├── INSTALLATION.md                  # Deployment guide
-├── AUTHENTICATION.md                # Security deep dive
-└── USER_MANAGEMENT.md              # User operations guide
+└── AUTHENTICATION.md                # Security deep dive
 ```
 
 ---
@@ -576,23 +578,57 @@ kubectl exec -it deployment/postgres -- psql -U ory_hydra -d ory_hydra -c \
 
 ## 👤 User Management
 
-See **[USER_MANAGEMENT.md](./USER_MANAGEMENT.md)** for complete guide.
+User management is handled directly through the PostgreSQL database. Only users created in the database can authenticate with the system.
 
-**Create user**:
+### Creating Users
+
+**1. Generate bcrypt hash for password:**
 ```bash
-# Generate bcrypt hash
-python3 -c "import bcrypt; print(bcrypt.hashpw(b'password', bcrypt.gensalt(rounds=10)).decode())"
-
-# Insert into database
-kubectl exec -it deployment/postgres -- psql -U ory_hydra -d ory_hydra -c \
-  "INSERT INTO users (email, password_hash, name) VALUES ('user@example.com', '\$2a\$10\$...', 'User');"
+python3 -c "import bcrypt; print(bcrypt.hashpw(b'your_password', bcrypt.gensalt(rounds=10)).decode())"
 ```
 
-**List users**:
+**2. Insert user into database:**
+```bash
+kubectl exec -it deployment/postgres -- psql -U ory_hydra -d ory_hydra -c \
+  "INSERT INTO users (email, password_hash, name) VALUES ('user@example.com', '\$2a\$10\$HASH_HERE', 'User Name');"
+```
+
+**3. Verify user was created:**
+```bash
+kubectl exec -it deployment/postgres -- psql -U ory_hydra -d ory_hydra -c \
+  "SELECT email, name, created_at FROM users WHERE email = 'user@example.com';"
+```
+
+### Managing Users
+
+**List all users:**
 ```bash
 kubectl exec -it deployment/postgres -- psql -U ory_hydra -d ory_hydra -c \
   "SELECT email, name, created_at FROM users;"
 ```
+
+**Update user password:**
+```bash
+# Generate new hash first
+python3 -c "import bcrypt; print(bcrypt.hashpw(b'new_password', bcrypt.gensalt(rounds=10)).decode())"
+
+# Update in database
+kubectl exec -it deployment/postgres -- psql -U ory_hydra -d ory_hydra -c \
+  "UPDATE users SET password_hash = '\$2a\$10\$NEW_HASH' WHERE email = 'user@example.com';"
+```
+
+**Delete user:**
+```bash
+kubectl exec -it deployment/postgres -- psql -U ory_hydra -d ory_hydra -c \
+  "DELETE FROM users WHERE email = 'user@example.com';"
+```
+
+### Security Notes
+
+- Passwords are stored as bcrypt hashes (cost 10) - they cannot be reversed to plaintext
+- Only administrators with Kubernetes access can create, update, or delete users
+- Users must exist in the database before they can authenticate
+- No self-registration functionality exists - all user management must be done manually
 
 ---
 
@@ -648,7 +684,6 @@ kubectl logs -l app.kubernetes.io/name=hydra --tail=100
 
 - **[INSTALLATION.md](./INSTALLATION.md)** - Complete deployment guide
 - **[AUTHENTICATION.md](./AUTHENTICATION.md)** - Security model and authentication flow
-- **[USER_MANAGEMENT.md](./USER_MANAGEMENT.md)** - User operations
 
 ---
 
