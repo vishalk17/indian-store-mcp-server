@@ -26,6 +26,9 @@ type Config struct {
 	JWTSecret          string
 	AccessTokenLifetime  int
 	RefreshTokenLifetime int
+
+	// Database Configuration
+	DatabaseURL string
 }
 
 func Load() *Config {
@@ -44,11 +47,15 @@ func Load() *Config {
 		JWTSecret:            getEnv("JWT_SECRET", "default-secret-change-in-production"),
 		AccessTokenLifetime:  getEnvAsInt("ACCESS_TOKEN_LIFETIME", 3600),
 		RefreshTokenLifetime: getEnvAsInt("REFRESH_TOKEN_LIFETIME", 604800),
+		DatabaseURL:          getEnv("DATABASE_URL", ""),
 	}
 
 	// Validate required fields
 	if cfg.OryURL == "" {
 		log.Fatal("ORY_URL is required")
+	}
+	if cfg.DatabaseURL == "" {
+		log.Fatal("DATABASE_URL is required")
 	}
 	// Note: ORY_CLIENT_ID and ORY_CLIENT_SECRET are not required
 	// MCP clients register themselves dynamically via /oauth/register

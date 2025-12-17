@@ -9,6 +9,7 @@ import (
 	"indian-store-mcp-server/internal/config"
 	"indian-store-mcp-server/internal/middleware"
 	"indian-store-mcp-server/internal/oauth"
+	"indian-store-mcp-server/internal/users"
 )
 
 // JSON-RPC 2.0 structures (matching the mcp-service pattern)
@@ -350,11 +351,18 @@ func main() {
 	oryClient := oauth.NewOryClient(cfg)
 	log.Printf("Ory client initialized with URL: %s", cfg.OryURL)
 
+	// Initialize user store with database
+	userStore, err := users.NewUserStore(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("Failed to initialize user store: %v", err)
+	}
+	log.Println("User store initialized with database connection")
+
 	// Create registration handler for dynamic client registration
 	registrationHandler := oauth.NewRegistrationHandler(cfg, oryClient)
 	
 	// Create login/consent handler for Ory Hydra flows
-	loginConsentHandler := oauth.NewLoginConsentHandler(oryClient)
+	loginConsentHandler := oauth.NewLoginConsentHandler(oryClient, userStore)
 
 	// Create authentication middleware
 	authMiddleware := middleware.NewAuthMiddleware(oryClient)
