@@ -1,9 +1,13 @@
+# Gateway API Configuration
+# Handles all incoming traffic for vishalk17.cloudwithme.dev
+
 apiVersion: gateway.networking.k8s.io/v1
 kind: GatewayClass
 metadata:
   name: mcp-service-indian-store-gatewayclass
 spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
+
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
@@ -26,11 +30,61 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
+          # TLS certificate Secret - must contain tls.crt and tls.key
+          # Create with cert-manager or manually
           - name: vishalk17.cloudwithme.dev-tls
       allowedRoutes:
         namespaces:
           from: All
 ---
+# HTTPRoute for Ory Hydra
+# Routes /ory/* and /oauth2/* to Ory Hydra public API
+# IMPORTANT: Must come BEFORE catch-all MCP route
+
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ory-hydra-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: mcp-service-indian-store-gateway
+  hostnames:
+    - "vishalk17.cloudwithme.dev"
+  rules:
+    # Route /ory/* to Ory Hydra and strip the /ory prefix
+    # Example: /ory/oauth2/auth becomes /oauth2/auth
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ory/
+      filters:
+        # URL rewrite strips /ory prefix before forwarding
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        # Service created by Ory Hydra Helm chart
+        - name: ory-hydra-public
+          port: 4444
+    
+    # Route /oauth2/* directly to Ory Hydra (no rewrite)
+    # This handles direct Hydra URLs without /ory prefix
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /oauth2/
+      backendRefs:
+        - name: ory-hydra-public
+          port: 4444
+
+---
+# HTTPRoute for MCP Server
+# Catch-all route for all other paths
+# IMPORTANT: Must come AFTER specific routes like Ory
+
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -42,10 +96,12 @@ spec:
   hostnames:
     - "vishalk17.cloudwithme.dev"
   rules:
+    # Catch all paths: /, /oauth/*, /mcp, /.well-known/*, /health, etc.
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
+        # Service from deployement.yaml
         - name: mcp-service-indian-store
           port: 80

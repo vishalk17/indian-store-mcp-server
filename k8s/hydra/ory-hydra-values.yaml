@@ -1,21 +1,32 @@
 # Ory Hydra Helm Values
-# For use with: helm install ory-hydra ory/hydra -f ory-hydra-values.yaml
+# Deploy with: helm install ory-hydra ory/hydra -f ory-hydra-values.yaml -n default
+# Upgrade with: helm upgrade ory-hydra ory/hydra -f ory-hydra-values.yaml -n default
 
 hydra:
   config:
-    dsn: memory
+    # PostgreSQL DSN - connection string to database
+    # Format: postgres://USERNAME:PASSWORD@HOST:PORT/DATABASE?sslmode=disable
+    # Must match credentials in postgres-sts.yaml
+    dsn: postgres://ory_hydra:ory_password_123@postgres.default.svc.cluster.local:5432/ory_hydra?sslmode=disable
     
     urls:
+      # Public issuer URL - must match your actual domain
       self:
         issuer: https://vishalk17.cloudwithme.dev
+      # Consent and login URLs - you need to implement these endpoints
+      # These are called by Hydra during OAuth flow
       consent: https://vishalk17.cloudwithme.dev/consent
       login: https://vishalk17.cloudwithme.dev/login
       
     secrets:
+      # System secret - encrypts database values
+      # Generate with: openssl rand -base64 32
       system:
-        - "change-this-system-secret-to-something-secure"
+        - "Lmw46yVWtgXIXIg/wG/kcsFN+uOELglhupiKJ7jejt4="
+      # Cookie secret - encrypts cookies
+      # Generate with: openssl rand -base64 32
       cookie:
-        - "change-this-cookie-secret-to-something-secure"
+        - "+AzFyZNkPirAaAlXnullOZmNYWSBrJeweIpC0h79opE="
     
     oauth2:
       expose_internal_errors: true
@@ -54,14 +65,14 @@ service:
     port: 4445
     name: ory-hydra-admin
 
-# Ingress (optional - you're using Gateway API)
+# Ingress disabled (using Gateway API)
 ingress:
   public:
     enabled: false
   admin:
     enabled: false
 
-# For development/testing - use PostgreSQL in production
+# Resources
 deployment:
   resources:
     limits:

@@ -1,0 +1,10 @@
+# Production secrets - NEVER commit!
+.secrets-production-BACKUP
+ory-hydra-secrets-prod.yaml
+*-secrets-prod.yaml
+*.env
+secrets.env
+
+# Backup files
+*.backup
+*.bak
