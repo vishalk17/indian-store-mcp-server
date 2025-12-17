@@ -102,33 +102,14 @@ vim hydra/ory-hydra-values.yaml
 helm upgrade ory-hydra ory/hydra -f hydra/ory-hydra-values.yaml -n default
 ```
 
-## Creating OAuth Clients
+## OAuth Clients
 
-### Method 1: Dynamic Registration (Recommended)
+**No manual setup needed!** MCP clients (ChatGPT, Claude) automatically register themselves via `/oauth/register` when they first connect.
+
+To view registered clients:
 ```bash
-curl -X POST https://vishalk17.cloudwithme.dev/oauth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "client_name": "My App",
-    "grant_types": ["authorization_code", "refresh_token"],
-    "redirect_uris": ["https://vishalk17.cloudwithme.dev/oauth/callback"],
-    "response_types": ["code"],
-    "scope": "openid profile email"
-  }'
+kubectl exec deployment/ory-hydra -- hydra list clients --endpoint http://localhost:4445
 ```
-
-### Method 2: Hydra CLI
-```bash
-kubectl exec -it deployment/ory-hydra -- \
-  hydra create client \
-  --endpoint http://localhost:4445 \
-  --grant-type authorization_code,refresh_token \
-  --response-type code \
-  --scope openid,profile,email \
-  --redirect-uri https://vishalk17.cloudwithme.dev/oauth/callback
-```
-
-**Important**: Save the `client_id` and `client_secret` returned, then update `configmap.yaml` and restart the MCP server.
 
 ## Endpoints
 

@@ -26,6 +26,10 @@ data:
   # OAuth callback URL - where Hydra redirects after authentication
   # Must match your domain and be registered with your OAuth client
   ORY_CALLBACK_URL: "https://vishalk17.cloudwithme.dev/oauth/callback"
+  
+  # Database URL - PostgreSQL connection string for user storage
+  # Using the same PostgreSQL instance as Ory Hydra
+  DATABASE_URL: "postgres://ory_hydra:ory_password_123@postgres.default.svc.cluster.local:5432/ory_hydra?sslmode=disable"
 
 ---
 apiVersion: v1
@@ -35,18 +39,9 @@ metadata:
   namespace: default
 type: Opaque
 stringData:
-  # OAuth Client ID and Secret
-  # ---------------------------
-  # NOTE: These are NOT needed for MCP server operation!
-  # MCP clients (like Claude.ai) register themselves dynamically via /oauth/register
-  # These variables are only used if YOUR server needs to act as an OAuth client
-  # For most MCP servers, leave these empty
-  ORY_CLIENT_ID: ""
-  ORY_CLIENT_SECRET: ""
-
   # JWT Secret
   # ----------
-  # Used by the MCP server to sign its own JWTs
+  # Used by the MCP server to sign its own JWTs (if needed for internal purposes)
   # Generate with: openssl rand -base64 32
   JWT_SECRET: "tGrWWHvaorTIyHcR3RtC43ufCsh41a95CEMAuAbsMqM="
 
