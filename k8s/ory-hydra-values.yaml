@@ -1,0 +1,75 @@
+# Ory Hydra Helm Values
+# For use with: helm install ory-hydra ory/hydra -f ory-hydra-values.yaml
+
+hydra:
+  config:
+    dsn: memory
+    
+    urls:
+      self:
+        issuer: https://vishalk17.cloudwithme.dev
+      consent: https://vishalk17.cloudwithme.dev/consent
+      login: https://vishalk17.cloudwithme.dev/login
+      
+    secrets:
+      system:
+        - "change-this-system-secret-to-something-secure"
+      cookie:
+        - "change-this-cookie-secret-to-something-secure"
+    
+    oauth2:
+      expose_internal_errors: true
+      
+    webfinger:
+      jwks:
+        broadcast_keys:
+          - hydra.openid.id-token
+      oidc_discovery:
+        supported_claims:
+          - sub
+          - email
+          - email_verified
+          - name
+        supported_scope:
+          - openid
+          - offline
+          - offline_access
+          - email
+          - profile
+
+  automigration:
+    enabled: true
+
+# Service configuration
+service:
+  public:
+    enabled: true
+    type: ClusterIP
+    port: 4444
+    name: ory-hydra-public
+  
+  admin:
+    enabled: true
+    type: ClusterIP
+    port: 4445
+    name: ory-hydra-admin
+
+# Ingress (optional - you're using Gateway API)
+ingress:
+  public:
+    enabled: false
+  admin:
+    enabled: false
+
+# For development/testing - use PostgreSQL in production
+deployment:
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Replica count
+replicaCount: 1

@@ -3,15 +3,15 @@ FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
-# Copy go files
-COPY go.mod ./
+# Copy go mod files
+COPY go.mod go.sum* ./
 RUN go mod download
 
-# Copy source
-COPY main.go ./
+# Copy entire source tree (including internal/)
+COPY . ./
 
 # Build binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o mcp-server
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o indian-store-server
 
 # ---- Runtime stage ----
 FROM alpine:3.20
@@ -19,7 +19,10 @@ FROM alpine:3.20
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/mcp-server /app/mcp-server
+COPY --from=builder /app/indian-store-server /app/indian-store-server
 
-# MCP servers usually use stdio
-ENTRYPOINT ["/app/mcp-server"]
+# Expose HTTP port
+EXPOSE 8080
+
+# Run the server
+CMD ["/app/indian-store-server"]

@@ -1,0 +1,149 @@
+# ============================================================================
+# ConfigMap for Indian Store MCP Server
+# 
+# This contains non-sensitive configuration values.
+# For sensitive values (secrets), see the Secret section below.
+# ============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: indian-store-config
+  namespace: default
+data:
+  # Server Configuration
+  # -------------------
+  HOST: "0.0.0.0"  # Keep as 0.0.0.0 to listen on all interfaces
+  PORT: "8080"      # Internal container port (do not change unless you modify Dockerfile)
+
+  # Ory Hydra URLs (Internal Kubernetes Services)
+  # ---------------------------------------------
+  # These point to Ory Hydra services INSIDE the cluster
+  # Format: http://<service-name>.<namespace>.svc.cluster.local:<port>
+  # 
+  # How to get: kubectl get svc -n default | grep ory-hydra
+  ORY_URL: "http://ory-hydra-public.default.svc.cluster.local:4444"
+  
+  # Ory Admin API URL (for Dynamic Client Registration)
+  # ---------------------------------------------------
+  # Used for RFC 7591 Dynamic Client Registration
+  # Points to Ory Hydra admin service INSIDE the cluster
+  # How to get: kubectl get svc ory-hydra-admin -n default
+  ORY_ADMIN_URL: "http://ory-hydra-admin.default.svc.cluster.local:4445"
+  
+  # Ory Admin API for token introspection (internal)
+  ORY_INTROSPECTION_URL: "http://ory-hydra-admin.default.svc.cluster.local:4445/admin/oauth2/introspect"
+  
+  # Ory UserInfo endpoint (internal)
+  ORY_USERINFO_URL: "http://ory-hydra-public.default.svc.cluster.local:4444/userinfo"
+
+  # OAuth Callback URL (External/Public URL)
+  # ----------------------------------------
+  # This is the PUBLIC URL where users will be redirected after OAuth login
+  # MUST match your domain and be registered in Ory OAuth client
+  # 
+  # How to set: Use your public domain
+  # Example: https://your-domain.com/oauth/callback
+  ORY_CALLBACK_URL: "https://vishalk17.cloudwithme.dev/oauth/callback"
+
+  # OAuth Scopes
+  # ------------
+  # Space-separated list of OAuth scopes to request
+  # Standard scopes: openid, offline_access (for refresh tokens), email, profile
+  ORY_SCOPES: "openid offline_access email profile"
+
+  # Token Lifetimes (in seconds)
+  # ----------------------------
+  ACCESS_TOKEN_LIFETIME: "3600"     # 1 hour (3600 seconds)
+  REFRESH_TOKEN_LIFETIME: "604800"  # 7 days (604800 seconds)
+
+---
+# ============================================================================
+# Secret for Indian Store MCP Server
+# 
+# This contains SENSITIVE values that must be kept secure.
+# NEVER commit real secrets to git!
+# ============================================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: indian-store-secrets
+  namespace: default
+type: Opaque
+stringData:
+  # OAuth Client ID
+  # ---------------
+  # How to get:
+  #   1. Create OAuth client in Ory:
+  #      kubectl run hydra-create-client --image=oryd/hydra:v2.2.0 --rm -it --restart=Never -- \
+  #        create oauth2-client \
+  #        --endpoint http://ory-hydra-admin.default.svc.cluster.local:4445 \
+  #        --name "Indian Store MCP Client" \
+  #        --secret "YOUR_GENERATED_SECRET" \
+  #        --grant-type authorization_code,refresh_token \
+  #        --response-type code \
+  #        --scope "openid,offline_access,email,profile" \
+  #        --redirect-uri https://vishalk17.cloudwithme.dev/oauth/callback \
+  #        --format json
+  #   2. Copy the "client_id" from the output
+  #   3. Paste it here
+  # 
+  # Current value is from initial setup - check with:
+  # kubectl get secret indian-store-secrets -n default -o jsonpath='{.data.ORY_CLIENT_ID}' | base64 -d
+  ORY_CLIENT_ID: "2643d722-7ec7-45ae-bd80-c01bdec9c1f1"
+
+  # OAuth Client Secret
+  # -------------------
+  # How to generate:
+  #   openssl rand -base64 32
+  # 
+  # MUST match the secret used when creating the OAuth client in Ory (see above)
+  # 
+  # ⚠️ CHANGE THIS IN PRODUCTION!
+  # Current value is a placeholder from initial setup
+  ORY_CLIENT_SECRET: "change-this-secret-in-production"
+
+  # JWT Secret for Session Management
+  # ----------------------------------
+  # How to generate:
+  #   openssl rand -base64 32
+  # 
+  # Used for signing internal JWTs (if needed for session management)
+  # Must be at least 32 characters
+  # 
+  # ⚠️ CHANGE THIS IN PRODUCTION!
+  JWT_SECRET: "your-jwt-secret-change-in-production-32chars"
+
+# ============================================================================
+# HOW TO UPDATE SECRETS IN PRODUCTION
+# ============================================================================
+#
+# Option 1: Update via kubectl patch
+# -----------------------------------
+# kubectl patch secret indian-store-secrets -n default --type merge -p '{
+#   "stringData": {
+#     "ORY_CLIENT_SECRET": "your-new-secret-here",
+#     "JWT_SECRET": "your-new-jwt-secret-here"
+#   }
+# }'
+#
+# Option 2: Use the automated script
+# -----------------------------------
+# Run: /home/vishalk17/ory/store/k8s/update-secrets.sh
+# This will:
+#   - Generate new secure secrets
+#   - Update Ory Hydra secrets
+#   - Recreate OAuth client with new secret
+#   - Update this Kubernetes secret
+#   - Restart services
+#
+# Option 3: Use External Secret Management (Recommended for Production)
+# ----------------------------------------------------------------------
+# Use tools like:
+#   - Sealed Secrets (bitnami-labs/sealed-secrets)
+#   - External Secrets Operator (external-secrets/external-secrets)
+#   - HashiCorp Vault
+#   - AWS Secrets Manager
+#   - Azure Key Vault
+#   - Google Secret Manager
+#
+# ============================================================================

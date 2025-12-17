@@ -5,6 +5,10 @@ import (
 	"log"
 	"net/http"
 	"sync"
+
+	"indian-store-mcp-server/internal/config"
+	"indian-store-mcp-server/internal/middleware"
+	"indian-store-mcp-server/internal/oauth"
 )
 
 // JSON-RPC 2.0 structures (matching the mcp-service pattern)
@@ -295,19 +299,98 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// OAuth Discovery endpoint for MCP clients
+func oauthDiscovery(cfg *config.Config) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Determine the base URL from headers or construct from request
+		scheme := "https"
+		if r.TLS == nil && r.Header.Get("X-Forwarded-Proto") == "" {
+			scheme = "http"
+		}
+		if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
+			scheme = proto
+		}
+		
+		host := r.Host
+		if forwardedHost := r.Header.Get("X-Forwarded-Host"); forwardedHost != "" {
+			host = forwardedHost
+		}
+		
+		baseURL := scheme + "://" + host
+
+		// OAuth discovery - clients use Ory Hydra directly, we only provide registration
+		discovery := map[string]interface{}{
+			"issuer":                                baseURL,
+			"authorization_endpoint":                baseURL + "/oauth2/auth",
+			"token_endpoint":                        baseURL + "/oauth2/token",
+			"registration_endpoint":                 baseURL + "/oauth/register",
+			"userinfo_endpoint":                     baseURL + "/oauth2/userinfo",
+			"introspection_endpoint":                baseURL + "/oauth2/introspect",
+			"response_types_supported":              []string{"code"},
+			"grant_types_supported":                 []string{"authorization_code", "refresh_token"},
+			"token_endpoint_auth_methods_supported": []string{"client_secret_basic", "client_secret_post"},
+			"scopes_supported":                      []string{"openid", "offline_access", "email", "profile"},
+			"subject_types_supported":               []string{"public"},
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(discovery)
+	}
+}
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+
+	// Load configuration
+	cfg := config.Load()
+	log.Println("Configuration loaded successfully")
+
+	// Initialize Ory client
+	oryClient := oauth.NewOryClient(cfg)
+	log.Printf("Ory client initialized with URL: %s", cfg.OryURL)
+
+	// Create registration handler for dynamic client registration
+	registrationHandler := oauth.NewRegistrationHandler(cfg, oryClient)
+	
+	// Create login/consent handler for Ory Hydra flows
+	loginConsentHandler := oauth.NewLoginConsentHandler(oryClient)
+
+	// Create authentication middleware
+	authMiddleware := middleware.NewAuthMiddleware(oryClient)
 
 	// Create MCP server
 	server := NewMCPServer()
 
-	// Setup HTTP handlers
-	http.HandleFunc("/mcp", server.handleMCPRequest)
+	// OAuth discovery endpoint (required by MCP clients)
+	http.HandleFunc("/.well-known/oauth-authorization-server", middleware.CORS(oauthDiscovery(cfg)))
+
+	// Setup OAuth registration endpoint (only endpoint we handle, rest is Ory)
+	http.HandleFunc("/oauth/register", middleware.CORS(registrationHandler.HandleRegister))
+	
+	// Redirect /oauth/authorize to /oauth2/auth for backward compatibility with cached clients
+	http.HandleFunc("/oauth/authorize", middleware.CORS(func(w http.ResponseWriter, r *http.Request) {
+		// Simply redirect to Ory's authorization endpoint with same query params
+		newURL := "https://" + r.Host + "/oauth2/auth?" + r.URL.RawQuery
+		http.Redirect(w, r, newURL, http.StatusFound)
+	}))
+
+	// Hydra Login/Consent and error fallback pages
+	http.HandleFunc("/login", middleware.CORS(loginConsentHandler.HandleLogin))
+	http.HandleFunc("/consent", middleware.CORS(loginConsentHandler.HandleConsent))
+	http.HandleFunc("/oauth2/fallbacks/error", middleware.CORS(loginConsentHandler.HandleError))
+
+	// Setup MCP endpoint (protected with auth)
+	http.HandleFunc("/mcp", middleware.CORS(authMiddleware.RequireAuth(server.handleMCPRequest)))
+
+	// Health check (no auth required)
 	http.HandleFunc("/health", healthCheck)
 
 	// Start server
-	port := "8080"
-	log.Printf("Indian Store MCP Server starting on port %s", port)
-	log.Printf("Endpoint: /mcp")
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	addr := cfg.Host + ":" + cfg.Port
+	log.Printf("Indian Store MCP Server with Ory OAuth starting on %s", addr)
+	log.Printf("OAuth Authorize: /oauth/authorize")
+	log.Printf("OAuth Callback: /oauth/callback")
+	log.Printf("MCP Endpoint (protected): /mcp")
+	log.Fatal(http.ListenAndServe(addr, nil))
 }

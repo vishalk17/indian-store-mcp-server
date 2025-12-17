@@ -15,10 +15,27 @@ spec:
     spec:
       containers:
         - name: indian-store-mcp
-          image: ghcr.io/vishalk17/indian-store-mcp-server:0.005
+          image: ghcr.io/vishalk17/indian-store-mcp-server:0.008
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: indian-store-config
+            - secretRef:
+                name: indian-store-secrets
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
 ---
 apiVersion: v1
 kind: Service
