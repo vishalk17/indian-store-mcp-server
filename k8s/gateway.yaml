@@ -1,0 +1,51 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: mcp-service-indian-store-gatewayclass
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: mcp-service-indian-store-gateway
+  namespace: default
+spec:
+  gatewayClassName: mcp-service-indian-store-gatewayclass
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: All
+
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: vishalk17.cloudwithme.dev-tls
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mcp-service-indian-store-route
+  namespace: default
+spec:
+  parentRefs:
+    - name: mcp-service-indian-store-gateway
+  hostnames:
+    - "vishalk17.cloudwithme.dev"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: mcp-service-indian-store
+          port: 80
