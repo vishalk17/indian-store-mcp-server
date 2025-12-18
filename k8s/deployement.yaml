@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: indian-store-mcp
-          image: ghcr.io/vishalk17/indian-store-mcp-server:0.005
+          image: ghcr.io/vishalk17/indian-store-mcp-server:0.201
           imagePullPolicy: Always
           ports:
             - containerPort: 8080

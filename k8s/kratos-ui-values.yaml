@@ -1,0 +1,24 @@
+config:
+  baseUrl: https://vishalk17.cloudwithme.dev/auth
+  
+deployment:
+  extraEnv:
+    - name: KRATOS_PUBLIC_URL
+      value: "https://vishalk17.cloudwithme.dev/kratos"
+    - name: KRATOS_BROWSER_URL
+      value: "https://vishalk17.cloudwithme.dev/kratos"
+    - name: COOKIE_SECRET
+      value: "8a00db2429194ca8cb56a72c272ed710"
+    - name: CSRF_COOKIE_NAME
+      value: "__HOST-csrf"
+    - name: CSRF_COOKIE_SECRET
+      value: "57237739d95f8a41968455be1a1c5302"
+    - name: PORT
+      value: "3000"
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: false

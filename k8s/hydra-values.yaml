@@ -1,0 +1,78 @@
+hydra:
+  config:
+    dsn: postgres://ory:changeme@postgres-postgresql:5432/hydra?sslmode=disable
+    
+    urls:
+      self:
+        issuer: https://vishalk17.cloudwithme.dev
+      login: https://vishalk17.cloudwithme.dev/auth/login
+      consent: https://vishalk17.cloudwithme.dev/auth/consent
+      logout: https://vishalk17.cloudwithme.dev/auth/logout
+      error: https://vishalk17.cloudwithme.dev/auth/error
+    
+    serve:
+      public:
+        cors:
+          enabled: true
+          allowed_origins:
+            - "*"
+      admin:
+        cors:
+          enabled: true
+    
+    secrets:
+      system:
+        - d06951843578d22007a14372d1af6aca
+    
+    oidc:
+      subject_identifiers:
+        supported_types:
+          - public
+      
+      dynamic_client_registration:
+        enabled: true
+        default_scope:
+          - openid
+          - email
+          - profile
+    
+    oauth2:
+      expose_internal_errors: true
+      
+    strategies:
+      access_token: jwt
+      scope: exact
+    
+    ttl:
+      access_token: 1h
+      refresh_token: 720h
+      id_token: 1h
+      auth_code: 10m
+
+  automigration:
+    enabled: true
+
+deployment:
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+service:
+  public:
+    enabled: true
+    type: ClusterIP
+    port: 4444
+  admin:
+    enabled: true
+    type: ClusterIP
+    port: 4445
+
+ingress:
+  public:
+    enabled: false
+  admin:
+    enabled: false
