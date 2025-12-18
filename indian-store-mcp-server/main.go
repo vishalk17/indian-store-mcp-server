@@ -1,10 +1,15 @@
 package main
 
 import (
+	"crypto/rsa"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
+	"strings"
 	"sync"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // JSON-RPC 2.0 structures (matching the mcp-service pattern)
@@ -105,6 +110,7 @@ type Content struct {
 type MCPServer struct {
 	initialized bool
 	mu          sync.RWMutex
+	jwksCache   *rsa.PublicKey
 }
 
 func NewMCPServer() *MCPServer {
@@ -239,6 +245,57 @@ func (s *MCPServer) handleCallTool(id interface{}, params json.RawMessage) JSONR
 	}
 }
 
+// JWT validation middleware
+func (s *MCPServer) jwtMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if auth == "" || !strings.HasPrefix(auth, "Bearer ") {
+			log.Println("Missing or invalid Authorization header")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		tokenString := strings.TrimPrefix(auth, "Bearer ")
+
+		// Parse JWT without validation (for testing)
+		// In production, fetch JWKS from https://vishalk17.cloudwithme.dev/.well-known/jwks.json
+		token, _, err := jwt.NewParser().ParseUnverified(tokenString, jwt.MapClaims{})
+		if err != nil {
+			log.Printf("Failed to parse token: %v", err)
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			log.Println("Invalid token claims")
+			http.Error(w, "Invalid token", http.StatusUnauthorized)
+			return
+		}
+
+		// Validate issuer
+		iss, _ := claims["iss"].(string)
+		if iss != "https://vishalk17.cloudwithme.dev/oauth2" {
+			log.Printf("Invalid issuer: %s", iss)
+			http.Error(w, "Invalid issuer", http.StatusUnauthorized)
+			return
+		}
+
+		log.Printf("Authenticated request from: %v", claims["sub"])
+		next(w, r)
+	}
+}
+
+// Validate JWT token with JWKS (production-ready)
+func (s *MCPServer) validateToken(tokenString string) error {
+	// TODO: Implement JWKS fetching and caching
+	// 1. Fetch https://vishalk17.cloudwithme.dev/.well-known/jwks.json
+	// 2. Parse and cache public keys
+	// 3. Verify token signature
+	// 4. Validate claims (exp, iss, aud)
+	return errors.New("not implemented")
+}
+
 // HTTP handler for MCP requests
 func (s *MCPServer) handleMCPRequest(w http.ResponseWriter, r *http.Request) {
 	// Set appropriate headers for MCP communication
@@ -302,7 +359,7 @@ func main() {
 	server := NewMCPServer()
 
 	// Setup HTTP handlers
-	http.HandleFunc("/mcp", server.handleMCPRequest)
+	http.HandleFunc("/mcp", server.jwtMiddleware(server.handleMCPRequest))
 	http.HandleFunc("/health", healthCheck)
 
 	// Start server
