@@ -26,7 +26,7 @@ spec:
       tls:
         mode: Terminate
         certificateRefs:
-          - name: vishalk17.cloudwithme.dev-tls
+          - name: wildcard-cloudwithme-dev-tls
       allowedRoutes:
         namespaces:
           from: All
