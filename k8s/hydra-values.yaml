@@ -24,11 +24,15 @@ hydra:
       system:
         - d06951843578d22007a14372d1af6aca
     
+    webfinger:
+      oidc_discovery:
+        client_registration_url: https://vishalk17.cloudwithme.dev/oauth2/register
+
     oidc:
       subject_identifiers:
         supported_types:
           - public
-      
+
       dynamic_client_registration:
         enabled: true
         default_scope:
